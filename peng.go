@@ -11,7 +11,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	b "peng/pkg/bitmap"
+	b "github.com/alessio-perugini/peng/pkg/bitmap"
 	"time"
 )
 

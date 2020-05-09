@@ -1,9 +1,12 @@
 package bitmap
 
-import "math/bits"
+import (
+	"math"
+	"math/bits"
+)
 
 // MaxBitmapSize is the maximum bitmap size (in bits).
-const MaxBitmapSize uint64 = 0x01 << 64-1
+const MaxBitmapSize uint64 = math.MaxUint64
 
 // Bitmap represents a bitmap.
 type Bitmap struct {
@@ -33,9 +36,9 @@ func (b *Bitmap) SetBit(offset uint64, v bool) bool {
 	}
 	index, bit := offset>>3, offset&7 // offset/8, offset%8
 	if v {
-		b.data[index] |= 0x01 << uint64(bit)
+		b.data[index] |= 0x01 << bit
 	} else {
-		b.data[index] &^= 0x01 << uint64(bit)
+		b.data[index] &^= 0x01 << bit
 	}
 	return true
 }
@@ -46,7 +49,7 @@ func (b *Bitmap) GetBit(offset uint64) bool {
 		return false
 	}
 	index, bit := offset>>3, offset&7
-	return (b.data[index]>>uint64(bit))&0x01 != 0
+	return (b.data[index]>>bit)&0x01 != 0
 }
 
 // Size returns the bitmap size (in bits).

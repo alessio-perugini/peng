@@ -1,4 +1,4 @@
-module peng
+module github.com/alessio-perugini/peng
 
 go 1.14
 
