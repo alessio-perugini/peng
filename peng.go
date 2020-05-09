@@ -1,17 +1,20 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
+	b "github.com/alessio-perugini/peng/pkg/bitmap"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	_ "github.com/google/gopacket/layers" //Used to init internal struct
 	"github.com/google/gopacket/pcap"
+	"github.com/influxdata/influxdb-client-go"
 	"log"
 	"math"
 	"net"
 	"os"
 	"os/signal"
-	b "github.com/alessio-perugini/peng/pkg/bitmap"
 	"time"
 )
 
@@ -25,9 +28,23 @@ var (
 	bitmap  = make([]b.Bitmap, nBin)
 	myIPs   = make([]net.IP, 0, 2)
 	epsilon = math.Nextafter(1.0, 2.0) - 1.0
+
+	influxUrl       string
+	bucket          string
+	organization    string
+	influxPort      uint
+	influxAuthToken string
 )
 
+//TODO influxdb stuff
 func main() {
+	flag.StringVar(&influxUrl, "influxUrl", "http://localhost", "influx url")
+	flag.UintVar(&influxPort, "influxPort", 9999, "influxPort number")
+	flag.StringVar(&bucket, "bucket", "", "bucket string for telegraf")
+	flag.StringVar(&organization, "org", "", "organization string for telegraf")
+	flag.StringVar(&influxAuthToken, "token", "", "auth token for influxdb")
+	flag.Parse()
+
 	GetMyIp()
 	initBitmap()
 
@@ -54,9 +71,10 @@ func main() {
 
 	packet := gopacket.NewPacketSource(pHandle, pHandle.LinkType())
 
-	time.AfterFunc(10*time.Second, End)
+	time.AfterFunc(time.Minute, End)
 	for packet := range packet.Packets() {
 		inspect(packet)
+		//TODO multithread?
 		//TODO proper handle termination
 		//TODO maybe use custom layers to avoid realloc for each packets (memory improvment)
 		//TODo maybe spawn goroutine foreach bitmap?
@@ -76,9 +94,13 @@ func hash(port uint16) (uint16, uint64) {
 	return index, bit
 }
 
-func InsertInBitmap(port uint16) {
+func InsertInBitmap(port uint16) error {
 	indexBin, bitBin := hash(port)
+	if indexBin >= uint16(len(bitmap)) {
+		return errors.New("index to access the bin is invalid")
+	}
 	bitmap[indexBin].SetBit(bitBin, true)
+	return nil
 }
 
 func ResetBitmap() {
@@ -96,10 +118,11 @@ func EntropyTotal(binsEntropy []float64) float64 {
 	return totalEntropy / float64(nBin)
 }
 
+//reference https://rosettacode.org/wiki/Entropy
 func EntropyOfEachBin() []float64 {
-	var total = float64(nBits)
-	var sum float64
-	allEntropy := make([]float64, 0, nBin)
+	var total = float64(nBits)             //number of bits in the bin
+	var sum float64                        //used to compute the entropy
+	allEntropy := make([]float64, 0, nBin) //used to calculate entropy of each bin
 
 	for i := 0; i < len(bitmap); i++ {
 		bitsAt1 := float64(bitmap[i].GetBitSets()) / total
@@ -110,9 +133,9 @@ func EntropyOfEachBin() []float64 {
 			sum -= bitsAt0 * math.Log(bitsAt0)
 		}
 		sum = sum / math.Log(2.0)
-
-		if bitsAt1 > bitsAt0 {
-			sum = 2 - sum
+		//this helps me to identifies the number of scanned port in entropy form
+		if bitsAt1 > bitsAt0 { //so i can distinguish if i'm in the range of [0-1] or [1-0] in term of standard gaussian
+			sum = 2 - sum //used to allow growth of entropy in wider range [0-2]
 		}
 
 		allEntropy = append(allEntropy, sum)
@@ -124,14 +147,16 @@ func EntropyOfEachBin() []float64 {
 
 func End() {
 	fmt.Println(bitmap)
-	fmt.Println("Bit settati: ")
+	fmt.Println("Bit set: ")
 	for i := 0; i < len(bitmap); i++ {
 		fmt.Println("pos [", i, "]  num: ", bitmap[i].GetBitSets())
 	}
 
 	binsEntropy := EntropyOfEachBin()
+	totalEntropy := EntropyTotal(binsEntropy)
+	PushToInfluxDb("server", totalEntropy, binsEntropy, time.Minute) //TODO generalizzare meglio
 	fmt.Println("EntropyOfEachBin: ", binsEntropy)
-	fmt.Println("EntropyTotal: ", EntropyTotal(binsEntropy))
+	fmt.Println("EntropyTotal: ", totalEntropy)
 
 	ResetBitmap()
 	os.Exit(1)
@@ -182,4 +207,34 @@ func inspect(packet gopacket.Packet) {
 			InsertInBitmap(uint16(tcp.DstPort))
 		}
 	}
+}
+
+//TODO generalizzare meglio
+func PushToInfluxDb(typeName string, totalEntropy float64, binsEntropy []float64, interval time.Duration) {
+	client := influxdb2.NewClient(influxUrl+":"+fmt.Sprint(influxPort), influxAuthToken)
+	defer client.Close()
+	writeApi := client.WriteApi(organization, bucket) //non-blocking
+
+	//Create fields to send to influx
+	influxFields := make(map[string]interface{}, len(binsEntropy)+2)
+	//Create a map for all entropy bucket
+	for k, v := range binsEntropy {
+		influxFields[fmt.Sprintf("bin_%d", k)] = v
+	}
+	influxFields["interval"] = interval.Minutes()
+	influxFields["total_entropy"] = totalEntropy
+
+	//Send point of system with hostname and values about in and out bits
+	p := influxdb2.NewPoint(
+		"entropy",
+		map[string]string{
+			"type": typeName,
+		},
+		influxFields,
+		time.Now())
+
+	writeApi.WritePoint(p)
+
+	writeApi.Flush() // Force all unwritten data to be sent
+
 }
