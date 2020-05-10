@@ -27,7 +27,7 @@ func New(cfg *Config) *PortBitmap {
 	}
 
 	var hashFunc = func(port uint16) (uint16, uint64) {
-		portModuled := port % uint16(cfg.SizeBitmap)
+		portModuled := (port / uint16(cfg.NumberOfBin)) % uint16(cfg.SizeBitmap)
 		index, bit := portModuled/uint16(cfg.NumberOfBits), uint64(portModuled)%uint64(cfg.NumberOfBits)
 		return index, bit
 	}

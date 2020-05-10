@@ -11,7 +11,7 @@ import (
 
 var (
 	config = p.Config{
-		NumberOfBin:        8,
+		NumberOfBin:        128,
 		NumberOfModule:     1024,
 		InfluxUrl:          "http://localhost",
 		InfluxPort:         9999,
@@ -27,8 +27,8 @@ var (
 
 func init() {
 	//Bitmap
-	flag.UintVar(&config.InfluxPort, "bin", 128, "number of bin in your bitmap")
-	flag.UintVar(&config.InfluxPort, "module", 1024, "maximum size of your bitmap")
+	flag.UintVar(&config.NumberOfBin, "bin", 128, "number of bin in your bitmap")
+	flag.UintVar(&config.NumberOfModule, "module", 1024, "maximum size of your bitmap")
 
 	//influx
 	flag.StringVar(&config.InfluxUrl, "influxUrl", "http://localhost", "influx url")
@@ -69,12 +69,6 @@ func flagConfig() {
 
 func main() {
 	flagConfig()
-
 	peng := p.New(&config)
-	peng.Portbitmap.HashFunc = func(port uint16) (uint16, uint64) {
-		portModuled := (port / uint16(config.NumberOfBin)) % uint16(config.NumberOfModule)
-		index, bit := portModuled/uint16(config.NumberOfBits), uint64(portModuled)%uint64(config.NumberOfBits)
-		return index, bit
-	}
 	peng.Start()
 }
