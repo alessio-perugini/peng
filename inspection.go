@@ -2,6 +2,7 @@ package peng
 
 import (
 	"fmt"
+	"github.com/alessio-perugini/peng/pkg/portbitmap"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	_ "github.com/google/gopacket/layers" //Used to init internal struct
@@ -34,23 +35,16 @@ func (p *Peng) inspect(packet gopacket.Packet) {
 		if tcp.SYN && !tcp.ACK {
 			fmt.Println(tcp.DstPort)
 			if packetDestToMyPc {
-				p.ServerFlowBtmp.addPortToBitmap(uint16(tcp.DstPort))
+				addPortToBitmap(uint16(tcp.DstPort), p.ServerTraffic)
 			} else {
-				p.ClientFlowBtmp.addPortToBitmap(uint16(tcp.DstPort))
+				addPortToBitmap(uint16(tcp.DstPort), p.ClientTraffic)
 			}
 		}
 	}
 }
 
-func (cf *ClientTraffic) addPortToBitmap(port uint16) {
-	err := cf.Portbitmap.AddPort(port)
-	if err != nil {
-		log.Println(err.Error())
-	}
-}
-
-func (sf *ServerTraffic) addPortToBitmap(port uint16) {
-	err := sf.Portbitmap.AddPort(port)
+func addPortToBitmap(port uint16, pBitmap *portbitmap.PortBitmap) {
+	err := pBitmap.AddPort(port)
 	if err != nil {
 		log.Println(err.Error())
 	}

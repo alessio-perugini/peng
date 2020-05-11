@@ -14,20 +14,8 @@ import (
 )
 
 type Peng struct {
-	Config *Config
-	//Portbitmap *portbitmap.PortBitmap
-	ClientFlowBtmp ClientTraffic
-	ServerFlowBtmp ServerTraffic
-}
-
-type ClientTraffic struct {
-	Portbitmap *portbitmap.PortBitmap
-	peng       *Peng //TODO u sure?
-}
-
-type ServerTraffic struct {
-	Portbitmap *portbitmap.PortBitmap
-	peng       *Peng //TODO u sure?
+	Config                       *Config
+	ClientTraffic, ServerTraffic *portbitmap.PortBitmap
 }
 
 type Config struct {
@@ -52,17 +40,10 @@ func New(cfg *Config) *Peng {
 		NumberOfBits: cfg.NumberOfBits,
 	}
 	var peng = Peng{
-		Config: cfg,
-		ClientFlowBtmp: ClientTraffic{
-			Portbitmap: portbitmap.New(bitmapConfig),
-		},
-		ServerFlowBtmp: ServerTraffic{
-			Portbitmap: portbitmap.New(bitmapConfig),
-		},
+		Config:        cfg,
+		ClientTraffic: portbitmap.New(bitmapConfig),
+		ServerTraffic: portbitmap.New(bitmapConfig),
 	}
-
-	peng.ServerFlowBtmp.peng = &peng //TODO ugly stuff here
-	peng.ClientFlowBtmp.peng = &peng //TODO ugly stuff here
 
 	return &peng
 }
@@ -85,7 +66,7 @@ func (p *Peng) Start() {
 
 		packet := gopacket.NewPacketSource(pHandle, pHandle.LinkType())
 
-		time.AfterFunc(p.Config.TimeFrame, p.printAllInfo)
+		time.AfterFunc(p.Config.TimeFrame, p.PrintAllInfo)
 		for packet := range packet.Packets() {
 			p.inspect(packet)
 			//TODO maybe use custom layers to avoid realloc for each packets (memory improvment)
@@ -102,56 +83,47 @@ func (p *Peng) Start() {
 	pHandle.Close()
 }
 
-func (cf *ClientTraffic) printInfo() {
-	var p = cf
+func printInfo(bitmap *portbitmap.PortBitmap) {
+	p := bitmap
 	binsEntropy := p.EntropyOfEachBin()
 	totalEntropy := p.EntropyTotal(binsEntropy)
+
+	//Print some stats
+	fmt.Println(p) //Print all bitmap
+	fmt.Println("Bit set: ")
+	for i := 0; i < len(p.InnerBitmap); i++ {
+		fmt.Println("bin number [", i, "]    num (bit at 1): ", p.InnerBitmap[i].GetBitSets())
+	}
+	fmt.Println("EntropyOfEachBin: ", binsEntropy)
+	fmt.Println("EntropyTotal: ", totalEntropy)
+
+	p.ClearAll()
+}
+
+func (p *Peng) PrintAllInfo() {
+	fmt.Println("#[CLIENT]#")
+	printInfo(p.ClientTraffic)
+	fmt.Println("\n#------------------------------------------------#\n#[SERVER]#")
+	printInfo(p.ServerTraffic)
+
+	//TODO generalizzare influx
+	//Server
+	binsEntropy := p.ServerTraffic.EntropyOfEachBin()
+	totalEntropy := p.ServerTraffic.EntropyTotal(binsEntropy)
 	influxField := map[string]interface{}{
 		"out": totalEntropy,
 	}
-	p.peng.PushToInfluxDb(influxField)
+	p.PushToInfluxDb(influxField)
 
-	//Print some stats
-	fmt.Println(p.Portbitmap) //Print all bitmap
-	fmt.Println("Bit set: ")
-	for i := 0; i < len(p.Portbitmap.InnerBitmap); i++ {
-		fmt.Println("bin number [", i, "]    num (bit at 1): ", p.Portbitmap.InnerBitmap[i].GetBitSets())
-	}
-	fmt.Println("EntropyOfEachBin: ", binsEntropy)
-	fmt.Println("EntropyTotal: ", totalEntropy)
-
-	p.Portbitmap.ClearAll()
-}
-
-func (sf *ServerTraffic) printInfo() {
-	var p = sf
-	binsEntropy := p.EntropyOfEachBin()
-	totalEntropy := p.EntropyTotal(binsEntropy)
-	influxField := map[string]interface{}{
+	//Client
+	binsEntropy = p.ClientTraffic.EntropyOfEachBin()
+	totalEntropy = p.ClientTraffic.EntropyTotal(binsEntropy)
+	influxField = map[string]interface{}{
 		"in": totalEntropy,
 	}
+	p.PushToInfluxDb(influxField)
 
-	p.peng.PushToInfluxDb(influxField)
-
-	//Print some stats
-	fmt.Println(p.Portbitmap) //Print all bitmap
-	fmt.Println("Bit set: ")
-	for i := 0; i < len(p.Portbitmap.InnerBitmap); i++ {
-		fmt.Println("bin number [", i, "]    num (bit at 1): ", p.Portbitmap.InnerBitmap[i].GetBitSets())
-	}
-	fmt.Println("EntropyOfEachBin: ", binsEntropy)
-	fmt.Println("EntropyTotal: ", totalEntropy)
-
-	p.Portbitmap.ClearAll()
-}
-
-func (p *Peng) printAllInfo() {
-	fmt.Println("#[CLIENT]#")
-	p.ClientFlowBtmp.printInfo()
-	fmt.Println("\n#------------------------------------------------#")
-	fmt.Println("#[SERVER]#")
-	p.ServerFlowBtmp.printInfo()
-	time.AfterFunc(p.Config.TimeFrame, p.printAllInfo)
+	time.AfterFunc(p.Config.TimeFrame, p.PrintAllInfo)
 }
 
 func (p *Peng) PushToInfluxDb(fields map[string]interface{}) {
