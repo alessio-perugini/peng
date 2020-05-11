@@ -106,29 +106,21 @@ func (p *Peng) PrintAllInfo() {
 	fmt.Println("\n#------------------------------------------------#\n#[SERVER]#")
 	printInfo(p.ServerTraffic)
 
-	//TODO generalizzare influx
-	//Server
-	binsEntropy := p.ServerTraffic.EntropyOfEachBin()
-	totalEntropy := p.ServerTraffic.EntropyTotal(binsEntropy)
-	influxField := map[string]interface{}{
-		"out": totalEntropy,
-	}
-	p.PushToInfluxDb(influxField)
-
-	//Client
-	binsEntropy = p.ClientTraffic.EntropyOfEachBin()
-	totalEntropy = p.ClientTraffic.EntropyTotal(binsEntropy)
-	influxField = map[string]interface{}{
-		"in": totalEntropy,
-	}
-	p.PushToInfluxDb(influxField)
+	p.PushToInfluxDb("out", p.ClientTraffic)
+	p.PushToInfluxDb("in", p.ServerTraffic)
 
 	time.AfterFunc(p.Config.TimeFrame, p.PrintAllInfo)
 }
 
-func (p *Peng) PushToInfluxDb(fields map[string]interface{}) {
+func (p *Peng) PushToInfluxDb(name string, portBin *portbitmap.PortBitmap) {
 	if p.Config.InfluxAuthToken == "" {
 		return
+	}
+
+	binsEntropy := portBin.EntropyOfEachBin()
+	totalEntropy := portBin.EntropyTotal(binsEntropy)
+	fields := map[string]interface{}{
+		name: totalEntropy,
 	}
 
 	client := influxdb2.NewClient(p.Config.InfluxUrl+":"+fmt.Sprint(p.Config.InfluxPort), p.Config.InfluxAuthToken)
