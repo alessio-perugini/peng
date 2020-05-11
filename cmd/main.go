@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"os/signal"
+	"time"
 )
 
 var (
@@ -22,6 +22,7 @@ var (
 		SaveFilePath:       "./peng-port-scan.log",
 		UseInflux:          false,
 	}
+	timeFrame = "1m"
 
 	versionFlag bool
 	version     = "0.0.0"
@@ -43,6 +44,7 @@ func init() {
 	//other
 	flag.BoolVar(&versionFlag, "version", false, "output version")
 	flag.StringVar(&config.SaveFilePath, "saveResult", "", "path to save the peng result")
+	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans")
 
 }
 
@@ -73,20 +75,20 @@ func flagConfig() {
 		log.Fatal("You must provide at least 1 method to send the data")
 	}
 
+	//Check timeFrame input to perform port scan detection
+	if v, err := time.ParseDuration(timeFrame); err != nil {
+		log.Fatal("Invalid interval format.")
+	} else if v.Seconds() <= 0 {
+		log.Fatal("Interval too short it must be at least 1 second long")
+	} else {
+		config.TimeFrame = v
+	}
+
 	fmt.Printf("%s\n", appString)
 }
 
 func main() {
 	flagConfig()
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			fmt.Println("Signalllll: ", sig)
-			os.Exit(1)
-		}
-	}()
 
 	peng := p.New(&config)
 	peng.Start()

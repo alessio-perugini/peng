@@ -18,7 +18,6 @@ func (p *Peng) inspect(packet gopacket.Packet) {
 	}
 
 	ipv4, _ := ipv4Layer.(*layers.IPv4)
-	//TODO check if in the flow src and dst non sono entrambe nella mia lista d'ip locale
 	var packetDestToMyPc bool
 	for _, ip := range myIPs {
 		if ipv4.SrcIP.Equal(ip) {
@@ -26,31 +25,31 @@ func (p *Peng) inspect(packet gopacket.Packet) {
 		}
 		if !packetDestToMyPc && ipv4.DstIP.Equal(ip) {
 			packetDestToMyPc = true
+			break
 		}
 	}
-	//Discard the request that doesn't contain my ip on destIp
 
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp, _ := tcpLayer.(*layers.TCP)
 		if tcp.SYN && !tcp.ACK {
 			fmt.Println(tcp.DstPort)
 			if packetDestToMyPc {
-				p.ServerFlowBtmp.addFlowPort(uint16(tcp.DstPort))
+				p.ServerFlowBtmp.addPortToBitmap(uint16(tcp.DstPort))
 			} else {
-				p.ClientFlowBtmp.addFlowPort(uint16(tcp.DstPort))
+				p.ClientFlowBtmp.addPortToBitmap(uint16(tcp.DstPort))
 			}
 		}
 	}
 }
 
-func (cf *ClientTraffic) addFlowPort(port uint16) {
+func (cf *ClientTraffic) addPortToBitmap(port uint16) {
 	err := cf.Portbitmap.AddPort(port)
 	if err != nil {
 		log.Println(err.Error())
 	}
 }
 
-func (sf *ServerTraffic) addFlowPort(port uint16) {
+func (sf *ServerTraffic) addPortToBitmap(port uint16) {
 	err := sf.Portbitmap.AddPort(port)
 	if err != nil {
 		log.Println(err.Error())
