@@ -9,6 +9,8 @@ import (
 	"net"
 )
 
+var myIPs = make([]net.IP, 0, 2)
+
 func (p *Peng) inspect(packet gopacket.Packet) {
 	var ipv4Layer gopacket.Layer //skip inspection if i can't obtain ip layer
 	if ipv4Layer = packet.Layer(layers.LayerTypeIPv4); ipv4Layer == nil {
@@ -30,7 +32,8 @@ func (p *Peng) inspect(packet gopacket.Packet) {
 
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp, _ := tcpLayer.(*layers.TCP)
-		if tcp.SYN {
+		if tcp.SYN && !tcp.ACK {
+			fmt.Println(tcp.DstPort)
 			if packetDestToMyPc {
 				p.ServerFlowBtmp.addFlowPort(uint16(tcp.DstPort))
 			} else {
@@ -40,15 +43,14 @@ func (p *Peng) inspect(packet gopacket.Packet) {
 	}
 }
 
-//TODO check if i have to make a pointer to FlowMode
-func (cf *ClientFlow) addFlowPort(port uint16) {
+func (cf *ClientTraffic) addFlowPort(port uint16) {
 	err := cf.Portbitmap.AddPort(port)
 	if err != nil {
 		log.Println(err.Error())
 	}
 }
 
-func (sf *ServerFlow) addFlowPort(port uint16) {
+func (sf *ServerTraffic) addFlowPort(port uint16) {
 	err := sf.Portbitmap.AddPort(port)
 	if err != nil {
 		log.Println(err.Error())

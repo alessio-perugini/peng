@@ -2,8 +2,10 @@ package peng
 
 import "math"
 
+var epsilon = math.Nextafter(1.0, 2.0) - 1.0
+
 //reference https://rosettacode.org/wiki/Entropy
-func (sf *ServerFlow) EntropyOfEachBin() []float64 {
+func (sf *ServerTraffic) EntropyOfEachBin() []float64 {
 	var total = float64(sf.Portbitmap.Config.NumberOfBits)             //number of bits in the bin
 	var sum float64                                                    //used to compute the entropy
 	allEntropy := make([]float64, 0, sf.Portbitmap.Config.NumberOfBin) //used to calculate entropy of each bin
@@ -29,7 +31,7 @@ func (sf *ServerFlow) EntropyOfEachBin() []float64 {
 	return allEntropy
 }
 
-func (cf *ClientFlow) EntropyOfEachBin() []float64 {
+func (cf *ClientTraffic) EntropyOfEachBin() []float64 {
 	var total = float64(cf.Portbitmap.Config.NumberOfBits)             //number of bits in the bin
 	var sum float64                                                    //used to compute the entropy
 	allEntropy := make([]float64, 0, cf.Portbitmap.Config.NumberOfBin) //used to calculate entropy of each bin
@@ -55,7 +57,7 @@ func (cf *ClientFlow) EntropyOfEachBin() []float64 {
 	return allEntropy
 }
 
-func (cf *ClientFlow) EntropyTotalStandard(binsEntropy []float64) float64 {
+func (cf *ClientTraffic) EntropyTotalStandard(binsEntropy []float64) float64 {
 	var standardEntropy float64
 
 	for _, v := range binsEntropy {
@@ -69,7 +71,7 @@ func (cf *ClientFlow) EntropyTotalStandard(binsEntropy []float64) float64 {
 	return standardEntropy / float64(cf.Portbitmap.Config.NumberOfBin)
 }
 
-func (sf *ServerFlow) EntropyTotalStandard(binsEntropy []float64) float64 {
+func (sf *ServerTraffic) EntropyTotalStandard(binsEntropy []float64) float64 {
 	var standardEntropy float64
 
 	for _, v := range binsEntropy {
@@ -83,7 +85,7 @@ func (sf *ServerFlow) EntropyTotalStandard(binsEntropy []float64) float64 {
 	return standardEntropy / float64(sf.Portbitmap.Config.NumberOfBin)
 }
 
-func (cf *ClientFlow) EntropyTotal(binsEntropy []float64) float64 {
+func (cf *ClientTraffic) EntropyTotal(binsEntropy []float64) float64 {
 	var totalEntropy float64
 
 	for _, v := range binsEntropy {
@@ -93,7 +95,7 @@ func (cf *ClientFlow) EntropyTotal(binsEntropy []float64) float64 {
 	return totalEntropy / float64(cf.Portbitmap.Config.NumberOfBin)
 }
 
-func (sf *ServerFlow) EntropyTotal(binsEntropy []float64) float64 {
+func (sf *ServerTraffic) EntropyTotal(binsEntropy []float64) float64 {
 	var totalEntropy float64
 
 	for _, v := range binsEntropy {

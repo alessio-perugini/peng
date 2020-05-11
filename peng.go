@@ -8,58 +8,51 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/influxdata/influxdb-client-go"
 	"log"
-	"math"
-	"net"
 	"os"
-	"os/signal"
 	"time"
 )
 
 type Peng struct {
 	Config *Config
 	//Portbitmap *portbitmap.PortBitmap
-	ClientFlowBtmp ClientFlow
-	ServerFlowBtmp ServerFlow
-
-	/*ClientFlow []ClientFlow
-	ServerFlow []ServerFlow*/
+	ClientFlowBtmp ClientTraffic
+	ServerFlowBtmp ServerTraffic
 }
 
+/*
 type Flow interface {
 	addFlowPort()
 	EntropyTotalStandard()
 	EntropyTotal()
 	EntropyOfEachBin()
 	printInfo()
-}
+	entropyOfEachBin()
+}*/
 
-type ClientFlow struct {
+type ClientTraffic struct {
 	TimeFrame  time.Duration
 	Portbitmap *portbitmap.PortBitmap
-	//Flow
+	peng       *Peng //TODO u sure?
 }
 
-type ServerFlow struct {
+type ServerTraffic struct {
 	TimeFrame  time.Duration
 	Portbitmap *portbitmap.PortBitmap
-	//Flow
+	peng       *Peng //TODO u sure?
 }
 
 type Config struct {
 	NumberOfBin        uint //TODO forse rimuovere i 2 campi e usare la config del portbitmap
 	NumberOfModule     uint
 	NumberOfBits       uint
+	SaveFilePath       string
+	UseInflux          bool
 	InfluxUrl          string
 	InfluxPort         uint
 	InfluxBucket       string
 	InfluxOrganization string
 	InfluxAuthToken    string
 }
-
-var (
-	myIPs   = make([]net.IP, 0, 2)
-	epsilon = math.Nextafter(1.0, 2.0) - 1.0
-)
 
 func New(cfg *Config) *Peng {
 	cfg.NumberOfBits = cfg.NumberOfModule / cfg.NumberOfBin
@@ -68,32 +61,26 @@ func New(cfg *Config) *Peng {
 		SizeBitmap:   cfg.NumberOfModule,
 		NumberOfBits: cfg.NumberOfBits,
 	}
-
-	return &Peng{
+	var peng = Peng{
 		Config: cfg,
-		//Portbitmap: portbitmap.New(bitmapConfig),
-		ClientFlowBtmp: ClientFlow{
+		ClientFlowBtmp: ClientTraffic{
 			TimeFrame:  time.Minute,
 			Portbitmap: portbitmap.New(bitmapConfig),
 		},
-		ServerFlowBtmp: ServerFlow{
+		ServerFlowBtmp: ServerTraffic{
 			TimeFrame:  time.Minute,
 			Portbitmap: portbitmap.New(bitmapConfig),
 		},
 	}
+
+	peng.ServerFlowBtmp.peng = &peng //TODO ugly stuff here
+	peng.ClientFlowBtmp.peng = &peng //TODO ugly stuff here
+
+	return &peng
 }
 
 func (p *Peng) Start() {
 	getMyIp()
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			fmt.Println(sig)
-			os.Exit(1)
-		}
-	}()
 
 	pHandle, err := pcap.OpenLive(
 		"eno1",
@@ -108,7 +95,7 @@ func (p *Peng) Start() {
 
 	packet := gopacket.NewPacketSource(pHandle, pHandle.LinkType())
 
-	time.AfterFunc(time.Minute, p.printInfoAndForceExit)
+	time.AfterFunc(10*time.Second, p.printInfoAndForceExit)
 	for packet := range packet.Packets() {
 		p.inspect(packet)
 		//TODO multithread?
@@ -118,12 +105,12 @@ func (p *Peng) Start() {
 	}
 }
 
-func (cf *ClientFlow) printInfo() {
+func (cf *ClientTraffic) printInfo() {
 	var p = cf
 	binsEntropy := p.EntropyOfEachBin()
 	totalEntropy := p.EntropyTotal(binsEntropy)
 	totalStandardEntropy := p.EntropyTotalStandard(binsEntropy)
-	//p.PushToInfluxDb("server", totalEntropy, binsEntropy, time.Minute) //TODO generalizzare meglio
+	p.peng.PushToInfluxDb("client", totalEntropy) //TODO generalizzare meglio
 
 	//Print some stats
 	fmt.Println(p.Portbitmap) //Print all bitmap
@@ -138,12 +125,12 @@ func (cf *ClientFlow) printInfo() {
 	p.Portbitmap.ClearAll()
 }
 
-func (sf *ServerFlow) printInfo() {
+func (sf *ServerTraffic) printInfo() {
 	var p = sf
 	binsEntropy := p.EntropyOfEachBin()
 	totalEntropy := p.EntropyTotal(binsEntropy)
 	totalStandardEntropy := p.EntropyTotalStandard(binsEntropy)
-	//p.PushToInfluxDb("server", totalEntropy, binsEntropy, time.Minute) //TODO generalizzare meglio
+	p.peng.PushToInfluxDb("server", totalEntropy) //TODO generalizzare meglio
 
 	//Print some stats
 	fmt.Println(p.Portbitmap) //Print all bitmap
@@ -165,28 +152,25 @@ func (p *Peng) printInfoAndForceExit() {
 	os.Exit(1)
 }
 
-//TODO generalizzare meglio
-func (p *Peng) PushToInfluxDb(typeName string, totalEntropy float64, binsEntropy []float64, interval time.Duration) {
+func (p *Peng) PushToInfluxDb(typeName string, totalEntropy float64) {
+	if p.Config.InfluxAuthToken == "" {
+		return
+	}
+
 	client := influxdb2.NewClient(p.Config.InfluxUrl+":"+fmt.Sprint(p.Config.InfluxPort), p.Config.InfluxAuthToken)
 	defer client.Close()
 	writeApi := client.WriteApi(p.Config.InfluxOrganization, p.Config.InfluxBucket) //non-blocking
 
-	//Create fields to send to influx
-	influxFields := make(map[string]interface{}, len(binsEntropy)+2)
-	//Create a map for all entropy bucket
-	for k, v := range binsEntropy {
-		influxFields[fmt.Sprintf("bin_%d", k)] = v
-	}
-	influxFields["interval"] = interval.Minutes()
-	influxFields["total_entropy"] = totalEntropy
-
 	//Send point of system with hostname and values about in and out bits
 	point := influxdb2.NewPoint(
-		"entropy",
+		"system",
 		map[string]string{
-			"type": typeName,
+			"port-entropy": typeName,
 		},
-		influxFields,
+		map[string]interface{}{
+			"in":  totalEntropy,
+			"out": totalEntropy,
+		},
 		time.Now())
 
 	writeApi.WritePoint(point)

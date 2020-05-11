@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
 )
 
 var (
@@ -18,6 +19,8 @@ var (
 		InfluxBucket:       "",
 		InfluxOrganization: "",
 		InfluxAuthToken:    "",
+		SaveFilePath:       "./peng-port-scan.log",
+		UseInflux:          false,
 	}
 
 	versionFlag bool
@@ -39,6 +42,8 @@ func init() {
 
 	//other
 	flag.BoolVar(&versionFlag, "version", false, "output version")
+	flag.StringVar(&config.SaveFilePath, "saveResult", "", "path to save the peng result")
+
 }
 
 func flagConfig() {
@@ -64,11 +69,25 @@ func flagConfig() {
 		log.Fatal("Influx url is not valid")
 	}
 
+	if config.InfluxAuthToken == "" && config.SaveFilePath == "" {
+		log.Fatal("You must provide at least 1 method to send the data")
+	}
+
 	fmt.Printf("%s\n", appString)
 }
 
 func main() {
 	flagConfig()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for sig := range c {
+			fmt.Println("Signalllll: ", sig)
+			os.Exit(1)
+		}
+	}()
+
 	peng := p.New(&config)
 	peng.Start()
 }

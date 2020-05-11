@@ -39,6 +39,7 @@ func New(cfg *Config) *PortBitmap {
 	}
 }
 
+//TODO check bitBin overflow
 func (p *PortBitmap) AddPort(port uint16) error {
 	indexBin, bitBin := p.HashFunc(port)
 	if indexBin >= uint16(len(p.InnerBitmap)) {
