@@ -19,7 +19,7 @@ var (
 		InfluxBucket:       "",
 		InfluxOrganization: "",
 		InfluxAuthToken:    "",
-		SaveFilePath:       "./peng-port-scan.log",
+		SaveFilePath:       "",
 		UseInflux:          false,
 	}
 	timeFrame = "1m"
@@ -45,7 +45,6 @@ func init() {
 	flag.BoolVar(&versionFlag, "version", false, "output version")
 	flag.StringVar(&config.SaveFilePath, "saveResult", "", "path to save the peng result")
 	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans")
-
 }
 
 func flagConfig() {
