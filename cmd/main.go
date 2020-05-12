@@ -13,7 +13,7 @@ import (
 var (
 	config = p.Config{
 		NumberOfBin:        128,
-		NumberOfModule:     1024,
+		SizeBitmap:         1024,
 		InfluxUrl:          "http://localhost",
 		InfluxPort:         9999,
 		InfluxBucket:       "",
@@ -21,6 +21,7 @@ var (
 		InfluxAuthToken:    "",
 		SaveFilePath:       "",
 		UseInflux:          false,
+		Verbose:            uint(0),
 	}
 	timeFrame = "1m"
 
@@ -31,8 +32,8 @@ var (
 
 func init() {
 	//Bitmap
-	flag.UintVar(&config.NumberOfBin, "bin", 128, "number of bin in your bitmap")
-	flag.UintVar(&config.NumberOfModule, "module", 1024, "maximum size of your bitmap")
+	flag.UintVar(&config.NumberOfBin, "bin", 16, "number of bin in your bitmap")
+	flag.UintVar(&config.SizeBitmap, "size", 1024, "size of your bitmap")
 
 	//influx
 	flag.StringVar(&config.InfluxUrl, "influxUrl", "http://localhost", "influx url")
@@ -45,6 +46,7 @@ func init() {
 	flag.BoolVar(&versionFlag, "version", false, "output version")
 	flag.StringVar(&config.SaveFilePath, "saveResult", "", "path to save the peng result")
 	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans")
+	flag.UintVar(&config.Verbose, "verbose", 0, "set verbose level (1-3)")
 }
 
 func flagConfig() {
@@ -81,6 +83,15 @@ func flagConfig() {
 		log.Fatal("Interval too short it must be at least 1 second long")
 	} else {
 		config.TimeFrame = v
+	}
+
+	//check if user exceed maximum allowed verbosity
+	if config.Verbose > 3 {
+		config.Verbose = 3
+	}
+
+	if config.SizeBitmap > 1<<16 {
+		log.Fatal("Size of full bitmap is too big, it must be less than 65536")
 	}
 
 	fmt.Printf("%s\n", appString)

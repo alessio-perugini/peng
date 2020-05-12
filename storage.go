@@ -32,6 +32,10 @@ func (p *Peng) PushToInfluxDb() {
 		time.Now())
 	writeApi.WritePoint(point)
 	writeApi.Flush() // Force all unwritten data to be sent
+
+	if p.Config.Verbose == 3 {
+		fmt.Printf("[%s] file successfully pushed to influxdb\n", time.Now().Local().String())
+	}
 }
 
 func (p *Peng) ExportToCsv() {
@@ -47,7 +51,7 @@ func (p *Peng) ExportToCsv() {
 
 	defer file.Close()
 
-	currTime := time.Now().String()
+	currTime := time.Now().Local().String()
 	writer := csv.NewWriter(file)
 	var csvData = [][]string{
 		{currTime, "client", fmt.Sprintf("%f", p.ClientTraffic.EntropyTotal())},
@@ -57,5 +61,10 @@ func (p *Peng) ExportToCsv() {
 	err = writer.WriteAll(csvData) // returns error
 	if err != nil {
 		log.Println("error on writing csv data ", err.Error())
+		return
+	}
+
+	if p.Config.Verbose == 3 {
+		fmt.Printf("[%s] data successfully exported to csv\n", time.Now().Local().String())
 	}
 }

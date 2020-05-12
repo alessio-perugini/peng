@@ -18,8 +18,8 @@ type Peng struct {
 }
 
 type Config struct {
-	NumberOfBin        uint //TODO forse rimuovere i 2 campi e usare la config del portbitmap
-	NumberOfModule     uint
+	NumberOfBin        uint
+	SizeBitmap         uint
 	NumberOfBits       uint
 	SaveFilePath       string
 	UseInflux          bool
@@ -28,14 +28,15 @@ type Config struct {
 	InfluxBucket       string
 	InfluxOrganization string
 	InfluxAuthToken    string
+	Verbose            uint
 	TimeFrame          time.Duration
 }
 
 func New(cfg *Config) *Peng {
-	cfg.NumberOfBits = cfg.NumberOfModule / cfg.NumberOfBin
+	cfg.NumberOfBits = cfg.SizeBitmap / cfg.NumberOfBin
 	bitmapConfig := &portbitmap.Config{
 		NumberOfBin:  cfg.NumberOfBin,
-		SizeBitmap:   cfg.NumberOfModule,
+		SizeBitmap:   cfg.SizeBitmap,
 		NumberOfBits: cfg.NumberOfBits,
 	}
 	var peng = Peng{
@@ -68,36 +69,43 @@ func (p *Peng) Start() {
 		time.AfterFunc(p.Config.TimeFrame, p.handler)
 		for packet := range packet.Packets() {
 			p.inspect(packet)
-			//TODO maybe use custom layers to avoid realloc for each packets (memory improvment)
 		}
 	}()
 
-	// Wait for Ctrl-C
 	sig := make(chan os.Signal, 1024)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
 	log.Println("got SIGTERM, closing handle")
 
-	// Close the handle
+	// Close the packet handler
 	pHandle.Close()
 }
 
-func printTrafficInfo(pBtmp *portbitmap.PortBitmap) {
-	fmt.Println(pBtmp) //Print all bitmap
-	fmt.Println("Bit set: ")
-	for i := 0; i < len(pBtmp.InnerBitmap); i++ {
-		fmt.Println("bin number [", i, "]    num (bit at 1): ", pBtmp.InnerBitmap[i].GetBitSets())
-	}
-
-	fmt.Println("EntropyOfEachBin: ", pBtmp.EntropyOfEachBin())
-	fmt.Println("EntropyTotal: ", pBtmp.EntropyTotal())
-}
-
 func (p *Peng) PrintAllInfo() {
-	fmt.Println("#[CLIENT]#")
-	printTrafficInfo(p.ClientTraffic)
-	fmt.Println("\n#------------------------------------------------#\n#[SERVER]#")
-	printTrafficInfo(p.ServerTraffic)
+	allPortTraffic := []*portbitmap.PortBitmap{p.ClientTraffic, p.ServerTraffic}
+	for i, v := range allPortTraffic {
+		if p.Config.Verbose >= 1 {
+			if i == 0 {
+				fmt.Printf("[%s] [CLIENT] ", time.Now().Local().String())
+			} else {
+				fmt.Printf("[%s] [SERVER] ", time.Now().Local().String())
+			}
+		}
+
+		if p.Config.Verbose == 3 {
+			fmt.Println(v) //Print all bitmap
+			fmt.Println("Bit set: ")
+			for i := 0; i < len(v.InnerBitmap); i++ {
+				fmt.Println("bin number [", i, "]    num (bit at 1): ", v.InnerBitmap[i].GetBitSets())
+			}
+		}
+		if p.Config.Verbose >= 2 {
+			fmt.Printf("entropy of each bin: %f\n", v.EntropyOfEachBin())
+		}
+		if p.Config.Verbose >= 1 {
+			fmt.Printf("total entropy: %f\n", v.EntropyTotal())
+		}
+	}
 }
 
 func (p *Peng) handler() {
