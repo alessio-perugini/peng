@@ -24,10 +24,10 @@ Used to spread a port unevenly in the bitmap.
 
 ```go
 func hash(port uint16) (uint16, uint64) {
-		portModuled := (port / uint16(cfg.NumberOfBin)) % uint16(cfg.SizeBitmap)
-		index, bit := portModuled/uint16(cfg.NumberOfBits), uint64(portModuled)%uint64(cfg.NumberOfBits)
-		return index, bit
-	}
+    portModuled := (port / uint16(cfg.NumberOfBin)) % uint16(cfg.SizeBitmap)
+    index, bit := portModuled/uint16(cfg.NumberOfBits), uint64(portModuled)%uint64(cfg.NumberOfBits)
+    return index, bit
+}
 ```
 
 #### Entropy function
