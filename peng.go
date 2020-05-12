@@ -75,7 +75,7 @@ func (p *Peng) Start() {
 	sig := make(chan os.Signal, 1024)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-	log.Println("got SIGTERM, closing handle")
+	log.Println("Quitting Peng, bye!")
 
 	// Close the packet handler
 	pHandle.Close()
@@ -84,19 +84,18 @@ func (p *Peng) Start() {
 func (p *Peng) PrintAllInfo() {
 	allPortTraffic := []*portbitmap.PortBitmap{p.ClientTraffic, p.ServerTraffic}
 	for i, v := range allPortTraffic {
-		if p.Config.Verbose >= 1 {
-			if i == 0 {
-				fmt.Printf("[%s] [CLIENT] ", time.Now().Local().String())
-			} else {
-				fmt.Printf("[%s] [SERVER] ", time.Now().Local().String())
-			}
-		}
-
 		if p.Config.Verbose == 3 {
 			fmt.Println(v) //Print all bitmap
 			fmt.Println("Bit set: ")
 			for i := 0; i < len(v.InnerBitmap); i++ {
 				fmt.Println("bin number [", i, "]    num (bit at 1): ", v.InnerBitmap[i].GetBitSets())
+			}
+		}
+		if p.Config.Verbose >= 1 {
+			if i == 0 {
+				fmt.Printf("[%s] [CLIENT] ", time.Now().Local().String())
+			} else {
+				fmt.Printf("[%s] [SERVER] ", time.Now().Local().String())
 			}
 		}
 		if p.Config.Verbose >= 2 {

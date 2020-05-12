@@ -44,13 +44,14 @@ func init() {
 
 	//other
 	flag.BoolVar(&versionFlag, "version", false, "output version")
-	flag.StringVar(&config.SaveFilePath, "saveResult", "", "path to save the peng result")
-	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans")
+	flag.StringVar(&config.SaveFilePath, "export", "", "file path to save the peng result as csv")
+	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans. Number + (s = seconds, m = minutes, h = hours)")
 	flag.UintVar(&config.Verbose, "verbose", 0, "set verbose level (1-3)")
 }
 
 func flagConfig() {
-	appString := fmt.Sprintf("sys-status version %s %s", version, commit)
+	appString := fmt.Sprintf("________                     \n___  __ \\__________________ _\n__  /_/ /  _ \\_  __ \\_  __ `/\n_  ____//  __/  / / /  /_/ / \n/_/     \\___//_/ /_/_\\__, /  \n                    /____/   \n"+
+		"version %s %s", version, commit)
 
 	flag.Usage = func() { //help flag
 		fmt.Fprintf(flag.CommandLine.Output(), "%s\n\nUsage: sys-status [options]\n", appString)
