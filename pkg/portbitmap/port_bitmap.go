@@ -58,6 +58,7 @@ func (p *PortBitmap) ClearAll() {
 	}
 }
 
+//https://rosettacode.org/wiki/Entropy
 func (p *PortBitmap) EntropyOfEachBin() []float64 {
 	var total = float64(p.Config.NumberOfBits)             //number of bits in the bin
 	var sum float64                                        //used to compute the entropy

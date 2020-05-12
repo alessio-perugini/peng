@@ -49,10 +49,9 @@ func init() {
 	flag.BoolVar(&versionFlag, "version", false, "output version")
 	flag.StringVar(&config.SaveFilePath, "export", "", "file path to save the peng result as csv")
 	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans. Number + (s = seconds, m = minutes, h = hours)")
-	flag.UintVar(&config.Verbose, "verbose", 0, "set verbose level (1-3)")
+	flag.UintVar(&config.Verbose, "verbose", 1, "set verbose level (1-3)")
 	flag.StringVar(&config.NetworkInterface, "network", "", "name of your network interface")
 	flag.BoolVar(&showInterfaceNames, "interfaces", false, "show the list of all your network interfaces")
-
 }
 
 func flagConfig() {
@@ -77,7 +76,7 @@ func flagConfig() {
 			log.Fatal(err.Error())
 		}
 		for _, v := range interfaces {
-			fmt.Printf("name: \"%s\" %s %s %d \n", v.Name, v.Description, v.Addresses, v.Flags)
+			fmt.Printf("name: \"%s\"\n\t %s %s %d \n", v.Name, v.Description, v.Addresses, v.Flags)
 		}
 		os.Exit(2)
 	}
@@ -94,8 +93,8 @@ func flagConfig() {
 		log.Fatal("Influx url is not valid")
 	}
 
-	if config.InfluxAuthToken == "" && config.SaveFilePath == "" {
-		log.Fatal("You must provide at least 1 method to send the data")
+	if config.InfluxAuthToken == "" && config.SaveFilePath == "" && config.Verbose == 0 {
+		log.Fatal("You must provide at least 1 method to send or display the data")
 	}
 
 	//Check timeFrame input to perform port scan detection
