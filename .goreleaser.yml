@@ -6,16 +6,12 @@ before:
 builds:
   - main: ./cmd/main.go
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
-      - darwin
       - windows
     goarch:
       - amd64
-      - arm64
-      - arm
-      - ppc64le
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}}
 
