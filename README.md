@@ -61,7 +61,16 @@ PortBitmap.
 ## Requirements
 `libpcap` `docker` and `influxDB 2.0`
 
-##### Running Influx on Docker
+#### Libpcap
+
+##### Linux
+`sudo apt-get install libpcap-dev`
+
+##### Windows
+install [winpcap](https://www.winpcap.org/install/default.htm)
+
+#### Influx
+##### Running on Docker
 
 > ```$ docker run --name influxdb -p 9999:9999 quay.io/influxdb/influxdb:2.0.0-beta```
 
