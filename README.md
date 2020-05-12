@@ -98,6 +98,20 @@ For more information visit: <https://v2.docs.influxdata.com/v2.0/get-started/>
 
 You can find `peng` binaries on the release tag
 
+## Dependencies
+
+[gopacket](https://github.com/google/gopacket) used for snmp requests
+
+```
+go get github.com/google/gopacket
+```
+
+[influxdb-client](https://github.com/influxdata/influxdb-client-go) used for influxdb request
+
+```
+github.com/influxdata/influxdb-client-go
+```
+
 ## Compile
 
 ```
@@ -158,28 +172,56 @@ Usage: sys-status [options]
 
 ```
 
-## Dependencies
+## Peng in action
 
-[gopacket](https://github.com/google/gopacket) used for snmp requests
-
-```
-go get github.com/google/gopacket
-```
-
-[influxdb-client](https://github.com/influxdata/influxdb-client-go) used for influxdb request
+Example of `Peng` run in a vps attacked with nmap.
+ 
+`sudo ./peng -export example.csv -timeFrame 1m -verbose 1 -network ens3`
 
 ```
-github.com/influxdata/influxdb-client-go
+[2020-05-12 21:59:23.470892594 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 21:59:23.472064964 +0200 CEST] [SERVER] total entropy: 0.034310
+[2020-05-12 22:00:23.473281504 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:00:23.473341867 +0200 CEST] [SERVER] total entropy: 0.039592
+[2020-05-12 22:01:23.473978497 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:01:23.474115757 +0200 CEST] [SERVER] total entropy: 0.031978
+[2020-05-12 22:02:23.474697460 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:02:23.474774361 +0200 CEST] [SERVER] total entropy: 0.029029
+[2020-05-12 22:03:23.475401756 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:03:23.475471083 +0200 CEST] [SERVER] total entropy: 0.029029
+[2020-05-12 22:04:23.476088620 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:04:23.476893474 +0200 CEST] [SERVER] total entropy: 0.471501 <--- nmap -p 1024-4500
+[2020-05-12 22:05:23.477620446 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:05:23.478184020 +0200 CEST] [SERVER] total entropy: 2.000000 <--- nmap -p 1-65535
+[2020-05-12 22:06:23.479309923 +0200 CEST] [CLIENT] total entropy: 0.000000 
+[2020-05-12 22:06:23.480428884 +0200 CEST] [SERVER] total entropy: 2.000000
+[2020-05-12 22:07:23.481522728 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:07:23.482427633 +0200 CEST] [SERVER] total entropy: 2.000000 <--- nmap -p 1-65535
+[2020-05-12 22:08:23.483598518 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:08:23.483668647 +0200 CEST] [SERVER] total entropy: 2.000000
+[2020-05-12 22:09:23.484227734 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:09:23.484265740 +0200 CEST] [SERVER] total entropy: 0.044114
+[2020-05-12 22:10:23.485277904 +0200 CEST] [CLIENT] total entropy: 0.000000
+[2020-05-12 22:10:23.486417752 +0200 CEST] [SERVER] total entropy: 0.029029
 ```
 
-## Create InfluxDB DashBoard
+Csv dump
 
-1. In the navigation menu on the left, select **Boards** (**Dashboards**).
+|time|client|server|
+|-|-|-|
+|2020-05-12 21:59:23.470412091 +0200 CEST|0.000000|0.034310|
+|2020-05-12 22:00:23.473068571 +0200 CEST|0.000000|0.039592|
+|2020-05-12 22:01:23.473690964 +0200 CEST|0.000000|0.031978|
+|2020-05-12 22:02:23.474517459 +0200 CEST|0.000000|0.029029|
+|2020-05-12 22:03:23.475135393 +0200 CEST|0.000000|0.029029|
+|2020-05-12 22:04:23.475877961 +0200 CEST|0.000000|**0.471501**|
+|2020-05-12 22:05:23.477429489 +0200 CEST|0.000000|**2.000000**|
+|2020-05-12 22:06:23.479014420 +0200 CEST|0.000000|**2.000000**|
+|2020-05-12 22:07:23.481216162 +0200 CEST|0.000000|**2.000000**|
+|2020-05-12 22:08:23.483284809 +0200 CEST|0.000000|**2.000000**|
+|2020-05-12 22:09:23.484062181 +0200 CEST|0.000000|0.044114|
+|2020-05-12 22:10:23.484760435 +0200 CEST|0.000000|0.029029|
 
-![dashboard](doc/img/dash-button.png)
-
-2. Click the **Create Dashboard** menu in the upper right and select **New Dashboard.**
-
-3. Enter a name for your dashboard in the **Name this dashboard** field in the upper left.
-
-Note: more info at [influxdb-doc](https://v2.docs.influxdata.com/v2.0/visualize-data/dashboards/) official doc
+**Note:** The **higher** the **entropy = higher chance** of being **port scanned**. Remember that the entropy (used in `Peng`) range 
+between 0 and 2. You should check the average entropy in normal circumstances and start alarming when you see the total 
+entropy with high value. Usually the first signs are around entropy of >= 0,40 (still very dependent on how many services you have).
