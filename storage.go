@@ -54,8 +54,7 @@ func (p *Peng) ExportToCsv() {
 	currTime := time.Now().Local().String()
 	writer := csv.NewWriter(file)
 	var csvData = [][]string{
-		{currTime, "client", fmt.Sprintf("%f", p.ClientTraffic.EntropyTotal())},
-		{currTime, "server", fmt.Sprintf("%f", p.ServerTraffic.EntropyTotal())},
+		{currTime, fmt.Sprintf("%f", p.ClientTraffic.EntropyTotal()), fmt.Sprintf("%f", p.ServerTraffic.EntropyTotal())},
 	}
 	// 3. Write all the records
 	err = writer.WriteAll(csvData) // returns error
