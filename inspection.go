@@ -8,6 +8,7 @@ import (
 	_ "github.com/google/gopacket/layers" //Used to init internal struct
 	"log"
 	"net"
+	"time"
 )
 
 var myIPs = make([]net.IP, 0, 2)
@@ -33,11 +34,18 @@ func (p *Peng) inspect(packet gopacket.Packet) {
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp, _ := tcpLayer.(*layers.TCP)
 		if tcp.SYN && !tcp.ACK {
-			fmt.Println(tcp.DstPort)
 			if packetDestToMyPc {
 				addPortToBitmap(uint16(tcp.DstPort), p.ServerTraffic)
 			} else {
 				addPortToBitmap(uint16(tcp.DstPort), p.ClientTraffic)
+			}
+
+			if p.Config.Verbose == 3 {
+				if packetDestToMyPc {
+					fmt.Printf("[%s] server traffic: %s \n", time.Now().Local().String(), tcp.DstPort.String())
+				} else {
+					fmt.Printf("[%s] client traffic: %s \n", time.Now().Local().String(), tcp.DstPort.String())
+				}
 			}
 		}
 	}
@@ -60,7 +68,6 @@ func getMyIp() {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
 				myIPs = append(myIPs, ipnet.IP)
-				fmt.Println(ipnet.IP.String())
 			}
 		}
 	}

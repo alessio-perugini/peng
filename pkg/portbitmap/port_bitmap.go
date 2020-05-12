@@ -84,7 +84,8 @@ func (p *PortBitmap) EntropyOfEachBin() []float64 {
 	return allEntropy
 }
 
-func (p *PortBitmap) EntropyTotal(binsEntropy []float64) float64 {
+func (p *PortBitmap) EntropyTotal() float64 {
+	binsEntropy := p.EntropyOfEachBin()
 	var totalEntropy float64
 
 	for _, v := range binsEntropy {

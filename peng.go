@@ -6,7 +6,6 @@ import (
 	"github.com/google/gopacket"
 	_ "github.com/google/gopacket/layers" //Used to init internal struct
 	"github.com/google/gopacket/pcap"
-	"github.com/influxdata/influxdb-client-go"
 	"log"
 	"os"
 	"os/signal"
@@ -19,8 +18,8 @@ type Peng struct {
 }
 
 type Config struct {
-	NumberOfBin        uint //TODO forse rimuovere i 2 campi e usare la config del portbitmap
-	NumberOfModule     uint
+	NumberOfBin        uint
+	SizeBitmap         uint
 	NumberOfBits       uint
 	SaveFilePath       string
 	UseInflux          bool
@@ -29,14 +28,15 @@ type Config struct {
 	InfluxBucket       string
 	InfluxOrganization string
 	InfluxAuthToken    string
+	Verbose            uint
 	TimeFrame          time.Duration
 }
 
 func New(cfg *Config) *Peng {
-	cfg.NumberOfBits = cfg.NumberOfModule / cfg.NumberOfBin
+	cfg.NumberOfBits = cfg.SizeBitmap / cfg.NumberOfBin
 	bitmapConfig := &portbitmap.Config{
 		NumberOfBin:  cfg.NumberOfBin,
-		SizeBitmap:   cfg.NumberOfModule,
+		SizeBitmap:   cfg.SizeBitmap,
 		NumberOfBits: cfg.NumberOfBits,
 	}
 	var peng = Peng{
@@ -66,77 +66,57 @@ func (p *Peng) Start() {
 
 		packet := gopacket.NewPacketSource(pHandle, pHandle.LinkType())
 
-		time.AfterFunc(p.Config.TimeFrame, p.PrintAllInfo)
+		time.AfterFunc(p.Config.TimeFrame, p.handler)
 		for packet := range packet.Packets() {
 			p.inspect(packet)
-			//TODO maybe use custom layers to avoid realloc for each packets (memory improvment)
 		}
 	}()
 
-	// Wait for Ctrl-C
 	sig := make(chan os.Signal, 1024)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-	log.Println("got SIGTERM, closing handle")
+	log.Println("Quitting Peng, bye!")
 
-	// Close the handle
+	// Close the packet handler
 	pHandle.Close()
 }
 
-func printInfo(bitmap *portbitmap.PortBitmap) {
-	p := bitmap
-	binsEntropy := p.EntropyOfEachBin()
-	totalEntropy := p.EntropyTotal(binsEntropy)
-
-	//Print some stats
-	fmt.Println(p) //Print all bitmap
-	fmt.Println("Bit set: ")
-	for i := 0; i < len(p.InnerBitmap); i++ {
-		fmt.Println("bin number [", i, "]    num (bit at 1): ", p.InnerBitmap[i].GetBitSets())
-	}
-	fmt.Println("EntropyOfEachBin: ", binsEntropy)
-	fmt.Println("EntropyTotal: ", totalEntropy)
-
-	p.ClearAll()
-}
-
 func (p *Peng) PrintAllInfo() {
-	fmt.Println("#[CLIENT]#")
-	printInfo(p.ClientTraffic)
-	fmt.Println("\n#------------------------------------------------#\n#[SERVER]#")
-	printInfo(p.ServerTraffic)
-
-	p.PushToInfluxDb("out", p.ClientTraffic)
-	p.PushToInfluxDb("in", p.ServerTraffic)
-
-	time.AfterFunc(p.Config.TimeFrame, p.PrintAllInfo)
+	allPortTraffic := []*portbitmap.PortBitmap{p.ClientTraffic, p.ServerTraffic}
+	for i, v := range allPortTraffic {
+		if p.Config.Verbose == 3 {
+			fmt.Println(v) //Print all bitmap
+			fmt.Println("Bit set: ")
+			for i := 0; i < len(v.InnerBitmap); i++ {
+				fmt.Println("bin number [", i, "]    num (bit at 1): ", v.InnerBitmap[i].GetBitSets())
+			}
+		}
+		if p.Config.Verbose >= 1 {
+			if i == 0 {
+				fmt.Printf("[%s] [CLIENT] ", time.Now().Local().String())
+			} else {
+				fmt.Printf("[%s] [SERVER] ", time.Now().Local().String())
+			}
+		}
+		if p.Config.Verbose >= 2 {
+			fmt.Printf("entropy of each bin: %f\n", v.EntropyOfEachBin())
+		}
+		if p.Config.Verbose >= 1 {
+			fmt.Printf("total entropy: %f\n", v.EntropyTotal())
+		}
+	}
 }
 
-func (p *Peng) PushToInfluxDb(name string, portBin *portbitmap.PortBitmap) {
-	if p.Config.InfluxAuthToken == "" {
-		return
-	}
+func (p *Peng) handler() {
+	p.PushToInfluxDb()
+	p.ExportToCsv()
 
-	binsEntropy := portBin.EntropyOfEachBin()
-	totalEntropy := portBin.EntropyTotal(binsEntropy)
-	fields := map[string]interface{}{
-		name: totalEntropy,
-	}
+	p.PrintAllInfo()
 
-	client := influxdb2.NewClient(p.Config.InfluxUrl+":"+fmt.Sprint(p.Config.InfluxPort), p.Config.InfluxAuthToken)
-	defer client.Close()
-	writeApi := client.WriteApi(p.Config.InfluxOrganization, p.Config.InfluxBucket) //non-blocking
+	//Clear bitmap for the new reader
+	p.ClientTraffic.ClearAll()
+	p.ServerTraffic.ClearAll()
 
-	//Send point of system with hostname and values about in and out bits
-	point := influxdb2.NewPoint(
-		"system",
-		map[string]string{
-			"entropy": "ports",
-		},
-		fields,
-		time.Now())
-
-	writeApi.WritePoint(point)
-
-	writeApi.Flush() // Force all unwritten data to be sent
+	//Wait timeframe time, before further actions
+	time.AfterFunc(p.Config.TimeFrame, p.handler)
 }
