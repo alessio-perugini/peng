@@ -38,7 +38,7 @@ and the number of bit set at 0. ```If bitAt1 > bitAt0 then entropy = 2 - entropy
 **range of entropy** from 0-1 to **0-2**. We can use this additional information to **understand how many bits** (hashed port) were
 **filled in a specific bin** (2 = all bits set, 0 = no bits set).
 
-[more info about entroy](https://github.com/influxdata/influxdb-client-go) 
+[more info about entroy](https://rosettacode.org/wiki/Entropy) 
 
 #### Bitmap data structure
 
