@@ -22,6 +22,7 @@ type Config struct {
 	SizeBitmap         uint
 	NumberOfBits       uint
 	SaveFilePath       string
+	NetworkInterface   string
 	UseInflux          bool
 	InfluxUrl          string
 	InfluxPort         uint
@@ -52,7 +53,7 @@ func (p *Peng) Start() {
 	getMyIp()
 
 	pHandle, err := pcap.OpenLive(
-		"eno1",
+		p.Config.NetworkInterface,
 		int32(65535),
 		false,
 		pcap.BlockForever)

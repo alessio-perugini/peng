@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	p "github.com/alessio-perugini/peng"
+	"github.com/google/gopacket/pcap"
 	"log"
 	"net/url"
 	"os"
@@ -22,12 +23,14 @@ var (
 		SaveFilePath:       "",
 		UseInflux:          false,
 		Verbose:            uint(0),
+		NetworkInterface:   "",
 	}
 	timeFrame = "1m"
 
-	versionFlag bool
-	version     = "0.0.0"
-	commit      = "commithash"
+	showInterfaceNames bool
+	versionFlag        bool
+	version            = "0.0.0"
+	commit             = "commithash"
 )
 
 func init() {
@@ -47,6 +50,9 @@ func init() {
 	flag.StringVar(&config.SaveFilePath, "export", "", "file path to save the peng result as csv")
 	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans. Number + (s = seconds, m = minutes, h = hours)")
 	flag.UintVar(&config.Verbose, "verbose", 0, "set verbose level (1-3)")
+	flag.StringVar(&config.NetworkInterface, "network", "", "name of your network interface")
+	flag.BoolVar(&showInterfaceNames, "interfaces", false, "show the list of all your network interfaces")
+
 }
 
 func flagConfig() {
@@ -65,7 +71,22 @@ func flagConfig() {
 		os.Exit(2)
 	}
 
-	if config.InfluxBucket == "" || config.InfluxOrganization == "" || config.InfluxAuthToken == "" {
+	if showInterfaceNames {
+		interfaces, err := pcap.FindAllDevs()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		for _, v := range interfaces {
+			fmt.Printf("name: \"%s\" %s %s %d \n", v.Name, v.Description, v.Addresses, v.Flags)
+		}
+		os.Exit(2)
+	}
+
+	if config.NetworkInterface == "" {
+		log.Fatal("You must provide the device adapter you want to listen to")
+	}
+
+	if config.InfluxAuthToken != "" && config.InfluxBucket == "" && config.InfluxOrganization == "" {
 		log.Fatal("You must provide bucket, organization and influxAuthToken")
 	}
 
