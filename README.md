@@ -178,6 +178,8 @@ Example of `Peng` run in a vps attacked with nmap.
  
 `sudo ./peng -export example.csv -timeFrame 1m -verbose 1 -network ens3`
 
+##### Console
+
 ```
 [2020-05-12 21:59:23.470892594 +0200 CEST] [CLIENT] total entropy: 0.000000
 [2020-05-12 21:59:23.472064964 +0200 CEST] [SERVER] total entropy: 0.034310
@@ -205,7 +207,7 @@ Example of `Peng` run in a vps attacked with nmap.
 [2020-05-12 22:10:23.486417752 +0200 CEST] [SERVER] total entropy: 0.029029
 ```
 
-Csv dump
+##### Csv dump
 
 |time|client|server|
 |-|-|-|
@@ -222,6 +224,15 @@ Csv dump
 |2020-05-12 22:09:23.484062181 +0200 CEST|0.000000|0.044114|
 |2020-05-12 22:10:23.484760435 +0200 CEST|0.000000|0.029029|
 
+##### Influx example
+
+![influx-scan](doc/img/scan.png)
+
+Data pushed every 15s
+
+The first 2 spikes was done with (nmap -p 1024-4500) the last one with (nmap -p- ~468.39 seconds). You can see that in normal
+condition we get a straight line, when a port scan is in action we see the spikes.
+
 **Note:** The **higher** the **entropy = higher chance** of being **port scanned**. Remember that the entropy (used in `Peng`) range 
 between 0 and 2. You should check the average entropy in normal circumstances and start alarming when you see the total 
-entropy with high value. Usually the first signs are around entropy of >= 0,40 (still very dependent on how many services you have).
+entropy with high value.
