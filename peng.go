@@ -61,10 +61,9 @@ func (p *Peng) Start() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer pHandle.Close()
 
 	go func() {
-		defer pHandle.Close()
-
 		packet := gopacket.NewPacketSource(pHandle, pHandle.LinkType())
 
 		time.AfterFunc(p.Config.TimeFrame, p.handler)
@@ -77,9 +76,6 @@ func (p *Peng) Start() {
 	signal.Notify(sig, os.Interrupt)
 	<-sig
 	log.Println("Quitting Peng, bye!")
-
-	// Close the packet handler
-	pHandle.Close()
 }
 
 func (p *Peng) PrintAllInfo() {

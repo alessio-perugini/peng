@@ -44,7 +44,7 @@ func (p *Peng) ExportToCsv() {
 	}
 
 	// 1. Open the file
-	file, err := os.OpenFile(p.Config.SaveFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(p.Config.SaveFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
 	if err != nil {
 		log.Println("error opening csv file", err.Error())
 	}
@@ -61,6 +61,10 @@ func (p *Peng) ExportToCsv() {
 	if err != nil {
 		log.Println("error on writing csv data ", err.Error())
 		return
+	}
+	err = file.Chown(65534, 65534)
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 
 	if p.Config.Verbose == 3 {
