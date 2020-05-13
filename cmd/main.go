@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
 	"time"
 )
 
@@ -123,4 +124,8 @@ func main() {
 
 	peng := p.New(&config)
 	peng.Start()
+	sig := make(chan os.Signal, 1024)
+	signal.Notify(sig, os.Interrupt)
+	<-sig
+	log.Println("Quitting Peng, bye!")
 }

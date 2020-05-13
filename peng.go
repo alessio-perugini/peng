@@ -7,8 +7,6 @@ import (
 	_ "github.com/google/gopacket/layers" //Used to init internal struct
 	"github.com/google/gopacket/pcap"
 	"log"
-	"os"
-	"os/signal"
 	"time"
 )
 
@@ -71,11 +69,6 @@ func (p *Peng) Start() {
 			p.inspect(packet)
 		}
 	}()
-
-	sig := make(chan os.Signal, 1024)
-	signal.Notify(sig, os.Interrupt)
-	<-sig
-	log.Println("Quitting Peng, bye!")
 }
 
 func (p *Peng) PrintAllInfo() {
