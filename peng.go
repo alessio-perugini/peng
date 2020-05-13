@@ -71,7 +71,6 @@ func (p *Peng) Start() {
 			p.inspect(packet)
 		}
 	}()
-
 	sig := make(chan os.Signal, 1024)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
