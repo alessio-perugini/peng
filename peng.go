@@ -1,21 +1,24 @@
 package peng
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+	"sync/atomic"
+	"syscall"
 	"time"
 
-	"github.com/alessio-perugini/peng/pkg/portbitmap"
 	"github.com/google/gopacket"
-	_ "github.com/google/gopacket/layers" //Used to init internal struct
+	_ "github.com/google/gopacket/layers" // Used to init internal struct
 	"github.com/google/gopacket/pcap"
+
+	"github.com/alessio-perugini/peng/pkg/portbitmap"
+	"github.com/alessio-perugini/peng/pkg/storage"
 )
 
 type Peng struct {
-	Config                       *Config
+	Config                       Config
 	ClientTraffic, ServerTraffic *portbitmap.PortBitmap
 }
 
@@ -26,13 +29,13 @@ type Config struct {
 	NetworkInterface string
 	Verbose          uint
 	TimeFrame        time.Duration
-	Storages         []Storage
+	Storages         []storage.Storage
 	MyIPs            []net.IP
 }
 
-func New(cfg *Config) *Peng {
+func New(cfg Config) *Peng {
 	cfg.NumberOfBits = cfg.SizeBitmap / cfg.NumberOfBin
-	bitmapConfig := &portbitmap.Config{
+	bitmapConfig := portbitmap.Config{
 		NumberOfBin:  cfg.NumberOfBin,
 		SizeBitmap:   cfg.SizeBitmap,
 		NumberOfBits: cfg.NumberOfBits,
@@ -45,63 +48,86 @@ func New(cfg *Config) *Peng {
 	}
 }
 
-func (p *Peng) Start() {
-	pHandle, err := pcap.OpenLive(p.Config.NetworkInterface, int32(65535), false, pcap.BlockForever)
-	if err != nil {
-		log.Fatal(err)
-	}
+func (p *Peng) Start(pHandle *pcap.Handle) {
 	defer pHandle.Close()
+
+	var isLive uint32
+	atomic.StoreUint32(&isLive, 1)
+	shutdownDone := make(chan bool, 1)
 
 	go func() {
 		packet := gopacket.NewPacketSource(pHandle, pHandle.LinkType())
+		t := time.AfterFunc(p.Config.TimeFrame, p.handler)
 
-		time.AfterFunc(p.Config.TimeFrame, p.handler)
 		for packet := range packet.Packets() {
+			if atomic.LoadUint32(&isLive) == 0 {
+				break
+			}
 			p.inspect(packet)
 		}
+
+		t.Stop()
+		shutdownDone <- true
 	}()
-	sig := make(chan os.Signal, 1024)
-	signal.Notify(sig, os.Interrupt)
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
+
+	atomic.StoreUint32(&isLive, 0)
+	<-shutdownDone
+
+	for _, v := range p.Config.Storages {
+		v.Stop()
+	}
+
 	log.Println("Quitting Peng, bye!")
 }
 
-func (p *Peng) PrintAllInfo() {
-	allPortTraffic := []*portbitmap.PortBitmap{p.ClientTraffic, p.ServerTraffic}
+func (p *Peng) printAllInfo(client, server *portbitmap.PortBitmap) {
+	allPortTraffic := []*portbitmap.PortBitmap{client, server}
 	for i, v := range allPortTraffic {
 		if p.Config.Verbose == 3 {
-			fmt.Println(v) //Print all bitmap
-			fmt.Println("Bit set: ")
-			for i := 0; i < len(v.InnerBitmap); i++ {
-				fmt.Println("bin number [", i, "]    num (bit at 1): ", v.InnerBitmap[i].GetBitSets())
+			log.Println(v)
+			log.Println("Bit set: ")
+			for j := 0; j < len(v.InnerBitmap); j++ {
+				log.Println("bin number [", j, "]    num (bit at 1): ", v.InnerBitmap[j].GetBitSets())
 			}
 		}
 		if p.Config.Verbose >= 1 {
 			if i == 0 {
-				fmt.Printf("[%s] [CLIENT] ", time.Now().Local().String())
+				log.Printf("[%s] [CLIENT] ", time.Now().Local().String())
 			} else {
-				fmt.Printf("[%s] [SERVER] ", time.Now().Local().String())
+				log.Printf("[%s] [SERVER] ", time.Now().Local().String())
 			}
 		}
 		if p.Config.Verbose >= 2 {
-			fmt.Printf("entropy of each bin: %f\n", v.EntropyOfEachBin())
+			log.Printf("entropy of each bin: %f\n", v.EntropyOfEachBin())
 		}
 		if p.Config.Verbose >= 1 {
-			fmt.Printf("total entropy: %f\n", v.EntropyTotal())
+			log.Printf("total entropy: %f\n", v.EntropyTotal())
 		}
 	}
 }
 
 func (p *Peng) handler() {
-	p.PushToInfluxDB()
-	p.ExportToCsv()
+	cTotalEntropy, sTotalEntropy := p.ClientTraffic.EntropyTotal(), p.ServerTraffic.EntropyTotal()
+	for _, v := range p.Config.Storages {
+		go func(v storage.Storage) {
+			if err := v.Push(cTotalEntropy, sTotalEntropy); err != nil {
+				log.Println(err)
+			}
+		}(v)
+	}
 
-	p.PrintAllInfo()
+	if p.Config.Verbose >= 1 {
+		p.printAllInfo(p.ClientTraffic, p.ServerTraffic)
+	}
 
-	//Clear bitmap for the new reader
+	// Clear bitmap for the new reader
 	p.ClientTraffic.ClearAll()
 	p.ServerTraffic.ClearAll()
 
-	//Wait timeframe time, before further actions
+	// Wait timeframe time, before further actions
 	time.AfterFunc(p.Config.TimeFrame, p.handler)
 }

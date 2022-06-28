@@ -1,23 +1,50 @@
 run:
   tests: true
   build-tags:
-    - unit
     - integration
+    - unit
   skip-files:
     - ".*_gen.go$"
 
 linters:
-  enable-all: true
-  disable:
-    - gomnd
-    - golint # deprecated, use revive instead
-    - interfacer #depcreted
-    - maligned # deprecated, replaced by govet 'fieldalignment'
-    - scopelint # deprecated, replaced by exportloopref
-  fast: false
+  enable:
+    - errcheck
+    - exportloopref
+    - gci
+    - gochecknoglobals
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gofmt
+    - gosec
+    - govet
+    - ineffassign
+    - megacheck
+    - misspell
+    - nakedret
+    - prealloc
+    - revive
+    - staticcheck
+    - stylecheck
+    - tparallel
+    - typecheck
+    - unparam
+    - unused
 
 linters-settings:
   gofmt:
     simplify: true
   goimports:
     local-prefixes: github.com/alessio-perugini
+  gci:
+    sections:
+      - standard # Captures all standard packages if they do not match another section.
+      - default # Contains all imports that could not be matched to another section type.
+      - prefix(github.com/alessio-perugini)
+    section-separators:
+      - newLine
+  revive:
+    rules:
+      - name: unexported-return
+        severity: warning
+        disabled: true

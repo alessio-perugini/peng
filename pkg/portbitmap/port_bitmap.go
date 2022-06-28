@@ -8,7 +8,7 @@ import (
 )
 
 type PortBitmap struct {
-	Config      *Config
+	Config      Config
 	InnerBitmap []b.Bitmap
 	HashFunc    func(port uint16) (uint16, uint64)
 }
@@ -19,9 +19,15 @@ type Config struct {
 	NumberOfBits uint
 }
 
-var epsilon = math.Nextafter(1.0, 2.0) - 1.0
+// nolint
+var (
+	ErrBitOffsetTooBig      = errors.New("bit offset too big")
+	ErrInvalidBinAcessIndex = errors.New("index to access the bin is invalid")
 
-func New(cfg *Config) *PortBitmap {
+	epsilon = math.Nextafter(1.0, 2.0) - 1.0
+)
+
+func New(cfg Config) *PortBitmap {
 	var InnerBitmap = make([]b.Bitmap, cfg.NumberOfBin)
 	cfg.NumberOfBits = cfg.SizeBitmap / cfg.NumberOfBin
 
@@ -45,10 +51,10 @@ func New(cfg *Config) *PortBitmap {
 func (p *PortBitmap) AddPort(port uint16) error {
 	indexBin, bitBin := p.HashFunc(port)
 	if indexBin >= uint16(len(p.InnerBitmap)) {
-		return errors.New("index to access the bin is invalid")
+		return ErrInvalidBinAcessIndex
 	}
 	if insert := p.InnerBitmap[indexBin].SetBit(bitBin, true); !insert {
-		return errors.New("bit offset too big")
+		return ErrBitOffsetTooBig
 	}
 	return nil
 }

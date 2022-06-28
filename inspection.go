@@ -1,18 +1,17 @@
 package peng
 
 import (
-	"fmt"
 	"log"
 	"time"
 
-	"github.com/alessio-perugini/peng/pkg/portbitmap"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	_ "github.com/google/gopacket/layers" //Used to init internal struct
+
+	"github.com/alessio-perugini/peng/pkg/portbitmap"
 )
 
 func (p *Peng) inspect(packet gopacket.Packet) {
-	var ipv4Layer gopacket.Layer //skip inspection if I can't obtain ip layer
+	var ipv4Layer gopacket.Layer // skip inspection if I can't obtain ip layer
 	if ipv4Layer = packet.Layer(layers.LayerTypeIPv4); ipv4Layer == nil {
 		return
 	}
@@ -29,22 +28,26 @@ func (p *Peng) inspect(packet gopacket.Packet) {
 		}
 	}
 
-	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-		tcp, _ := tcpLayer.(*layers.TCP)
-		if tcp.SYN && !tcp.ACK {
-			if packetDestToMyPc {
-				addPortToBitmap(uint16(tcp.DstPort), p.ServerTraffic)
-			} else {
-				addPortToBitmap(uint16(tcp.DstPort), p.ClientTraffic)
-			}
+	tcpLayer := packet.Layer(layers.LayerTypeTCP)
+	if tcpLayer == nil {
+		return
+	}
+	tcp, _ := tcpLayer.(*layers.TCP)
+	if !tcp.SYN || tcp.ACK {
+		return
+	}
 
-			if p.Config.Verbose == 3 {
-				if packetDestToMyPc {
-					fmt.Printf("[%s] server traffic: %s\n", time.Now().Local().String(), tcp.DstPort.String())
-				} else {
-					fmt.Printf("[%s] client traffic: %s\n", time.Now().Local().String(), tcp.DstPort.String())
-				}
-			}
+	if packetDestToMyPc {
+		addPortToBitmap(uint16(tcp.DstPort), p.ServerTraffic)
+	} else {
+		addPortToBitmap(uint16(tcp.DstPort), p.ClientTraffic)
+	}
+
+	if p.Config.Verbose == 3 {
+		if packetDestToMyPc {
+			log.Printf("[%s] server traffic: %s\n", time.Now().Local().String(), tcp.DstPort.String())
+		} else {
+			log.Printf("[%s] client traffic: %s\n", time.Now().Local().String(), tcp.DstPort.String())
 		}
 	}
 }

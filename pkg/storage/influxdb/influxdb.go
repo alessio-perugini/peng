@@ -2,13 +2,14 @@ package influxdb
 
 import (
 	"fmt"
+	"time"
+
 	influxdb2 "github.com/influxdata/influxdb-client-go"
 	"github.com/influxdata/influxdb-client-go/api"
-	"time"
 )
 
 type Config struct {
-	InfluxUrl          string
+	InfluxURL          string
 	InfluxPort         uint
 	InfluxBucket       string
 	InfluxOrganization string
@@ -22,7 +23,7 @@ type InfluxDB struct {
 }
 
 func New(cfg Config) *InfluxDB {
-	client := influxdb2.NewClient(fmt.Sprintf("%s:%d", cfg.InfluxUrl, cfg.InfluxPort), cfg.InfluxAuthToken)
+	client := influxdb2.NewClient(fmt.Sprintf("%s:%d", cfg.InfluxURL, cfg.InfluxPort), cfg.InfluxAuthToken)
 	return &InfluxDB{
 		client: client,
 		writer: client.WriteAPI(cfg.InfluxOrganization, cfg.InfluxBucket),
@@ -30,8 +31,8 @@ func New(cfg Config) *InfluxDB {
 	}
 }
 
-// Push Send point of system with hostname and values about in and out bits
-func (i *InfluxDB) Push(in, out []float64) error {
+// Push Send point of system with hostname and values about in and out bits.
+func (i *InfluxDB) Push(in, out float64) error {
 	point := influxdb2.NewPoint(
 		"system",
 		map[string]string{
