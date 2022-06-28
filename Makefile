@@ -1,9 +1,9 @@
 build:
-	@CGO_ENABLED=0 go build -a -trimpath -ldflags "-s -w -X main.version=${APP_VERSION}" -o bin/app ./cmd/main.go
+	@CGO_ENABLED=1 go build -a -trimpath -ldflags "-s -w -X main.version=${APP_VERSION}" -o bin/app ./cmd/main.go
 .PHONY: build
 
 test:
-	CGO_ENABLED=0 go test -v ./...
+	CGO_ENABLED=1 go test -v ./...
 .PHONY: test
 
 fmt:
@@ -15,5 +15,5 @@ lint:
 .PHONY: lint
 
 mod-upgrade:
-	@go get -u ./...
+	@go get -u ./... && go mod tidy
 .PHONY: mod-upgrade

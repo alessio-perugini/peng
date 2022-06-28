@@ -3,31 +3,35 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/alessio-perugini/peng/pkg/util"
 	"log"
-	"net"
 	"net/url"
 	"os"
+	"syscall"
 	"time"
 
-	p "github.com/alessio-perugini/peng"
 	"github.com/google/gopacket/pcap"
+
+	p "github.com/alessio-perugini/peng"
+	"github.com/alessio-perugini/peng/pkg/storage/csv"
+	"github.com/alessio-perugini/peng/pkg/storage/influxdb"
 )
 
+// nolint
 var (
 	config = p.Config{
-		NumberOfBin:        128,
-		SizeBitmap:         1024,
-		InfluxUrl:          "http://localhost",
+		NumberOfBin: 128,
+		SizeBitmap:  1024,
+	}
+	timeFrame    = "1m"
+	saveFilePath string
+	influxCfg    = influxdb.Config{
+		InfluxURL:          "http://localhost",
 		InfluxPort:         9999,
 		InfluxBucket:       "",
 		InfluxOrganization: "",
 		InfluxAuthToken:    "",
-		SaveFilePath:       "",
-		UseInflux:          false,
-		Verbose:            uint(0),
-		NetworkInterface:   "",
 	}
-	timeFrame = "1m"
 
 	showInterfaceNames bool
 	versionFlag        bool
@@ -35,21 +39,22 @@ var (
 	commit             = "commithash"
 )
 
+// nolint
 func init() {
 	//Bitmap
 	flag.UintVar(&config.NumberOfBin, "bin", 16, "number of bin in your bitmap")
 	flag.UintVar(&config.SizeBitmap, "size", 1024, "size of your bitmap")
 
 	//influx
-	flag.StringVar(&config.InfluxUrl, "influxUrl", "http://localhost", "influx url")
-	flag.UintVar(&config.InfluxPort, "influxPort", 9999, "influxPort number")
-	flag.StringVar(&config.InfluxBucket, "bucket", "", "bucket string for telegraf")
-	flag.StringVar(&config.InfluxOrganization, "org", "", "organization string for telegraf")
-	flag.StringVar(&config.InfluxAuthToken, "token", "", "auth token for influxdb")
+	flag.StringVar(&influxCfg.InfluxURL, "influxUrl", "http://localhost", "influx url")
+	flag.UintVar(&influxCfg.InfluxPort, "influxPort", 9999, "influxPort number")
+	flag.StringVar(&influxCfg.InfluxBucket, "bucket", "", "bucket string for telegraf")
+	flag.StringVar(&influxCfg.InfluxOrganization, "org", "", "organization string for telegraf")
+	flag.StringVar(&influxCfg.InfluxAuthToken, "token", "", "auth token for influxdb")
 
 	//other
 	flag.BoolVar(&versionFlag, "version", false, "output version")
-	flag.StringVar(&config.SaveFilePath, "export", "", "file path to save the peng result as csv")
+	flag.StringVar(&saveFilePath, "export", "", "file path to save the peng result as csv")
 	flag.StringVar(&timeFrame, "timeFrame", "1m", "interval time to detect scans. Number + (s = seconds, m = minutes, h = hours)")
 	flag.UintVar(&config.Verbose, "verbose", 1, "set verbose level (1-3)")
 	flag.StringVar(&config.NetworkInterface, "network", "", "name of your network interface")
@@ -60,14 +65,14 @@ func flagConfig() {
 	appString := fmt.Sprintf("________                     \n___  __ \\__________________ _\n__  /_/ /  _ \\_  __ \\_  __ `/\n_  ____//  __/  / / /  /_/ / \n/_/     \\___//_/ /_/_\\__, /  \n                    /____/   \n"+
 		"version %s %s", version, commit)
 
-	flag.Usage = func() { //help flag
+	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "%s\n\nUsage: sys-status [options]\n", appString)
 		flag.PrintDefaults()
 	}
 
 	flag.Parse()
 
-	if versionFlag { //version flag
+	if versionFlag {
 		fmt.Fprintf(flag.CommandLine.Output(), "%s\n", appString)
 		os.Exit(2)
 	}
@@ -78,7 +83,7 @@ func flagConfig() {
 			log.Fatal(err.Error())
 		}
 		for _, v := range interfaces {
-			fmt.Printf("name: \"%s\"\n\t %s %s %d \n", v.Name, v.Description, v.Addresses, v.Flags)
+			log.Printf("name: \"%s\"\n\t %s %s %d \n", v.Name, v.Description, v.Addresses, v.Flags)
 		}
 		os.Exit(2)
 	}
@@ -87,28 +92,30 @@ func flagConfig() {
 		log.Fatal("You must provide the device adapter you want to listen to")
 	}
 
-	if config.InfluxAuthToken != "" && config.InfluxBucket == "" && config.InfluxOrganization == "" {
+	if influxCfg.InfluxAuthToken != "" && influxCfg.InfluxBucket == "" && influxCfg.InfluxOrganization == "" {
 		log.Fatal("You must provide bucket, organization and influxAuthToken")
 	}
 
-	if _, err := url.ParseRequestURI(config.InfluxUrl); err != nil {
+	if _, err := url.ParseRequestURI(influxCfg.InfluxURL); err != nil {
 		log.Fatal("Influx url is not valid")
 	}
 
-	if config.InfluxAuthToken == "" && config.SaveFilePath == "" && config.Verbose == 0 {
+	if influxCfg.InfluxAuthToken == "" && saveFilePath == "" {
 		log.Fatal("You must provide at least 1 method to send or display the data")
 	}
 
-	//Check timeFrame input to perform port scan detection
-	if v, err := time.ParseDuration(timeFrame); err != nil {
+	// Check timeFrame input to perform port scan detection
+	v, err := time.ParseDuration(timeFrame)
+	if err != nil {
 		log.Fatal("Invalid interval format.")
-	} else if v.Seconds() <= 0 {
+	}
+	if v.Seconds() <= 0 {
 		log.Fatal("Interval too short it must be at least 1 second long")
-	} else {
-		config.TimeFrame = v
 	}
 
-	//check if user exceed maximum allowed verbosity
+	config.TimeFrame = v
+
+	// check if user exceed maximum allowed verbosity
 	if config.Verbose > 3 {
 		config.Verbose = 3
 	}
@@ -117,36 +124,37 @@ func flagConfig() {
 		log.Fatal("Size of full bitmap is too big, it must be less than 65536")
 	}
 
-	fmt.Printf("%s\n", appString)
+	log.Printf("%s\n", appString)
 }
 
 func main() {
 	flagConfig()
 
-	myIPs, err := getMyIps()
+	myIPs, err := util.GetMyIps()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	config.MyIPs = myIPs
-	peng := p.New(&config)
 
-	peng.Start()
-}
+	if influxCfg.InfluxAuthToken != "" {
+		config.Storages = append(config.Storages, influxdb.New(influxCfg))
+	}
+	if saveFilePath != "" {
+		config.Storages = append(config.Storages, csv.New(saveFilePath))
+	}
 
-func getMyIps() ([]net.IP, error) {
-	addrs, err := net.InterfaceAddrs()
+	pHandle, err := pcap.OpenLive(config.NetworkInterface, int32(65535), false, pcap.BlockForever)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
-	myIPs := make([]net.IP, 0, len(addrs))
-
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-			myIPs = append(myIPs, ipnet.IP)
-		}
+	if err = syscall.Setgid(1000); err != nil {
+		log.Fatal("Setgid error:", err)
+	}
+	if err = syscall.Setuid(1000); err != nil {
+		log.Fatal("Setuid error:", err)
 	}
 
-	return myIPs, nil
+	p.New(config).Start(pHandle)
 }

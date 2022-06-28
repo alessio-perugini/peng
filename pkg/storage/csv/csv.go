@@ -15,10 +15,10 @@ func New(path string) *Csv {
 	return &Csv{path: path}
 }
 
-func (c *Csv) Push(in, out []float64) error {
+func (c *Csv) Push(in, out float64) error {
 	file, err := os.OpenFile(c.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
 	if err != nil {
-		return err
+		return fmt.Errorf("csv error %w", err)
 	}
 
 	defer file.Close()
@@ -32,10 +32,7 @@ func (c *Csv) Push(in, out []float64) error {
 	}
 
 	if err = csv.NewWriter(file).WriteAll(csvData); err != nil {
-		return err
-	}
-	if err = file.Chown(65534, 65534); err != nil {
-		return err
+		return fmt.Errorf("csv error %w", err)
 	}
 
 	return nil
