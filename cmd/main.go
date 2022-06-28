@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	p "github.com/alessio-perugini/peng"
-	"github.com/google/gopacket/pcap"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"time"
+
+	p "github.com/alessio-perugini/peng"
+	"github.com/google/gopacket/pcap"
 )
 
 var (
@@ -121,7 +123,30 @@ func flagConfig() {
 func main() {
 	flagConfig()
 
-	peng := p.New(&config)
-	peng.Start()
+	myIPs, err := getMyIps()
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	config.MyIPs = myIPs
+	peng := p.New(&config)
+
+	peng.Start()
+}
+
+func getMyIps() ([]net.IP, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+
+	myIPs := make([]net.IP, 0, len(addrs))
+
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+			myIPs = append(myIPs, ipnet.IP)
+		}
+	}
+
+	return myIPs, nil
 }

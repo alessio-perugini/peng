@@ -2,14 +2,16 @@ package peng
 
 import (
 	"fmt"
+	"log"
+	"net"
+	"os"
+	"os/signal"
+	"time"
+
 	"github.com/alessio-perugini/peng/pkg/portbitmap"
 	"github.com/google/gopacket"
 	_ "github.com/google/gopacket/layers" //Used to init internal struct
 	"github.com/google/gopacket/pcap"
-	"log"
-	"os"
-	"os/signal"
-	"time"
 )
 
 type Peng struct {
@@ -18,19 +20,14 @@ type Peng struct {
 }
 
 type Config struct {
-	NumberOfBin        uint
-	SizeBitmap         uint
-	NumberOfBits       uint
-	SaveFilePath       string
-	NetworkInterface   string
-	UseInflux          bool
-	InfluxUrl          string
-	InfluxPort         uint
-	InfluxBucket       string
-	InfluxOrganization string
-	InfluxAuthToken    string
-	Verbose            uint
-	TimeFrame          time.Duration
+	NumberOfBin      uint
+	SizeBitmap       uint
+	NumberOfBits     uint
+	NetworkInterface string
+	Verbose          uint
+	TimeFrame        time.Duration
+	Storages         []Storage
+	MyIPs            []net.IP
 }
 
 func New(cfg *Config) *Peng {
@@ -40,24 +37,16 @@ func New(cfg *Config) *Peng {
 		SizeBitmap:   cfg.SizeBitmap,
 		NumberOfBits: cfg.NumberOfBits,
 	}
-	var peng = Peng{
+
+	return &Peng{
 		Config:        cfg,
 		ClientTraffic: portbitmap.New(bitmapConfig),
 		ServerTraffic: portbitmap.New(bitmapConfig),
 	}
-
-	return &peng
 }
 
 func (p *Peng) Start() {
-	getMyIp()
-
-	pHandle, err := pcap.OpenLive(
-		p.Config.NetworkInterface,
-		int32(65535),
-		false,
-		pcap.BlockForever)
-
+	pHandle, err := pcap.OpenLive(p.Config.NetworkInterface, int32(65535), false, pcap.BlockForever)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,7 +93,7 @@ func (p *Peng) PrintAllInfo() {
 }
 
 func (p *Peng) handler() {
-	p.PushToInfluxDb()
+	p.PushToInfluxDB()
 	p.ExportToCsv()
 
 	p.PrintAllInfo()
