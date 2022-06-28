@@ -2,8 +2,9 @@ package portbitmap
 
 import (
 	"errors"
-	b "github.com/alessio-perugini/peng/pkg/bitmap"
 	"math"
+
+	b "github.com/alessio-perugini/peng/pkg/bitmap"
 )
 
 type PortBitmap struct {
@@ -58,11 +59,11 @@ func (p *PortBitmap) ClearAll() {
 	}
 }
 
-//https://rosettacode.org/wiki/Entropy
+// EntropyOfEachBin https://rosettacode.org/wiki/Entropy
 func (p *PortBitmap) EntropyOfEachBin() []float64 {
-	var total = float64(p.Config.NumberOfBits)             //number of bits in the bin
-	var sum float64                                        //used to compute the entropy
-	allEntropy := make([]float64, 0, p.Config.NumberOfBin) //used to calculate entropy of each bin
+	var total = float64(p.Config.NumberOfBits)             // number of bits in the bin
+	var sum float64                                        // used to compute the entropy
+	allEntropy := make([]float64, 0, p.Config.NumberOfBin) // used to calculate entropy of each bin
 
 	for i := 0; i < len(p.InnerBitmap); i++ {
 		bitsAt1 := float64(p.InnerBitmap[i].GetBitSets()) / total
@@ -72,10 +73,10 @@ func (p *PortBitmap) EntropyOfEachBin() []float64 {
 			sum -= bitsAt1 * math.Log(bitsAt1)
 			sum -= bitsAt0 * math.Log(bitsAt0)
 		}
-		sum = sum / math.Log(2.0)
-		//this helps me to identifies the number of scanned port in entropy form
-		if bitsAt1 > bitsAt0 { //so i can distinguish if i'm in the range of [0-1] or [1-0] in term of standard gaussian
-			sum = 2 - sum //used to allow growth of entropy in wider range [0-2]
+		sum /= math.Log(2.0)
+		// this helps me to identifies the number of scanned port in entropy form
+		if bitsAt1 > bitsAt0 { // so I can distinguish if I'm in the range of [0-1] or [1-0] in terms of standard gaussian
+			sum = 2 - sum // used to allow growth of entropy in wider range [0-2]
 		}
 
 		allEntropy = append(allEntropy, sum)
@@ -86,8 +87,8 @@ func (p *PortBitmap) EntropyOfEachBin() []float64 {
 }
 
 func (p *PortBitmap) EntropyTotal() float64 {
-	binsEntropy := p.EntropyOfEachBin()
 	var totalEntropy float64
+	binsEntropy := p.EntropyOfEachBin()
 
 	for _, v := range binsEntropy {
 		totalEntropy += v

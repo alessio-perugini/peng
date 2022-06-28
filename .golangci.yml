@@ -1,0 +1,23 @@
+run:
+  tests: true
+  build-tags:
+    - unit
+    - integration
+  skip-files:
+    - ".*_gen.go$"
+
+linters:
+  enable-all: true
+  disable:
+    - gomnd
+    - golint # deprecated, use revive instead
+    - interfacer #depcreted
+    - maligned # deprecated, replaced by govet 'fieldalignment'
+    - scopelint # deprecated, replaced by exportloopref
+  fast: false
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/alessio-perugini
